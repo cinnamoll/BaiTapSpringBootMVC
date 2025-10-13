@@ -1,15 +1,15 @@
 package com.example.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.AllArgsConstructor; 
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-@NoArgsConstructor
+@NoArgsConstructor // gen construcor ko arg
 @AllArgsConstructor
-@Data
-@Entity
-@Table(name = "courses")
+@Data // gen setter, getter, toString, equal, hashCode
+@Entity // class có thể map đến table 
+@Table(name = "courseData") // tên db dùng
 public class Course {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,0 +1,12 @@
+# k8s-manifests/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# Argo CD sẽ tự động sử dụng Image được thiết lập trong file này (thường là SHA)
+images:
+  - name: ghcr.io/cinnamoll/baiceps-spring-mvc
+    newTag: "latest" # Giá trị này sẽ được GitHub Actions cập nhật bằng SHA

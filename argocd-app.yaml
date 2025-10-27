@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: baiceps-spring-mvc
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io # Giúp dọn dẹp tài nguyên khi xóa app
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/cinnamoll/BaiTapSpringBootMVC.git # URL repository của bạn
+    targetRevision: main # Nhánh Argo CD sẽ theo dõi
+    path: k8s-manifests # THƯ MỤC chứa deployment.yaml, service.yaml, kustomization.yaml
+  destination:
+    server: https://kubernetes.default.svc # Cluster đích (Cụm Minikube của bạn)
+    namespace: spring-mvc-prod # Namespace ứng dụng sẽ được deploy vào
+  syncPolicy:
+    automated:
+      prune: true # Xóa các tài nguyên đã bị loại bỏ khỏi Git
+      selfHeal: true # Tự động sửa chữa nếu ai đó thay đổi tài nguyên ngoài Git
+    syncOptions:
+      - CreateNamespace=true # Tự động tạo namespace nếu chưa tồn tại

@@ -1,0 +1,13 @@
+# k8s-manifests/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: spring-mvc-service
+spec:
+  selector:
+    app: spring-mvc
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer # Hoặc ClusterIP nếu bạn dùng Ingress

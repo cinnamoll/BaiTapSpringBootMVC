@@ -1,0 +1,28 @@
+# k8s-manifests/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring-mvc-app
+  labels:
+    app: spring-mvc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spring-mvc
+  template:
+    metadata:
+      labels:
+        app: spring-mvc
+    spec:
+      containers:
+        - name: spring-mvc-container
+          # Đặt một tag placeholder. GitHub Actions sẽ thay thế nó.
+          image: ghcr.io/cinnamoll/baiceps-spring-mvc:latest
+          ports:
+            - containerPort: 8080
+          # Thêm biến môi trường, ví dụ cho Database
+          # env:
+          #   - name: SPRING_DATASOURCE_URL
+          #     value: jdbc:mysql://db-host:3306/db
+---

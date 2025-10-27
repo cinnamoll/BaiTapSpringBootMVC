@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: baiceps-spring-mvc
+  name: baitap-spring-mvc
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io # Giúp dọn dẹp tài nguyên khi xóa app

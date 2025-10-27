@@ -1,0 +1,115 @@
+name: Spring Boot CI/CD Pipeline
+
+# Kích hoạt pipeline khi có code được push lên nhánh 'main'
+on:
+  push:
+    branches:
+      - main
+    # Bỏ qua khi chỉ có thay đổi trong thư mục k8s-manifests
+    # vì những thay đổi đó là do pipeline này tự commit, tránh lặp vô hạn (loop)
+    paths-ignore:
+      - 'k8s-manifests/**'
+
+# Các biến môi trường (Environment Variables) chung
+env:
+  # Tên image sẽ được push lên GitHub Container Registry (GHCR)
+  IMAGE_NAME: baitap-spring-mvc
+  # Registry (Sử dụng GHCR - nơi lưu trữ Docker Image của GitHub)
+  REGISTRY: ghcr.io
+  # Phiên bản Java
+  JAVA_VERSION: '17'
+
+jobs:
+  build-test-push-and-update:
+    name: Build, Push Image & Update Manifest (CI/CD)
+    runs-on: ubuntu-latest
+    
+    # Cần quyền 'contents: write' để có thể commit lại file k8s-manifests/kustomization.yaml
+    # Cần quyền 'packages: write' để push image lên GHCR
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v4
+        # Cần fetch history để có thể push commit mới (cập nhật manifest)
+        with:
+          fetch-depth: 0
+
+      # ====================================================================
+      # 1. CI - Build & Test
+      # ====================================================================
+
+      - name: ⚙️ Setup Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: 📦 Build Spring Boot App (Maven)
+        # Sử dụng Maven Wrapper để đảm bảo tính di động
+        run: ./mvnw clean package -DskipTests
+        # Loại bỏ -DskipTests nếu bạn muốn chạy Unit Test trong CI
+
+      # ====================================================================
+      # 2. CI - Build & Push Docker Image
+      # ====================================================================
+
+      - name: 🏗️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔑 Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # Sử dụng GITHUB_TOKEN mặc định cho GHCR
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Set image tag
+        id: image_tag
+        # Gắn tag bằng 7 ký tự đầu tiên của Git SHA (unique identifier)
+        run: echo "TAG=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Gắn 2 tag: 'latest' (cho tiện lợi) và SHA (cho GitOps)
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.image_tag.outputs.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ====================================================================
+      # 3. CD - Cập nhật Manifest (GitOps Trigger)
+      # ====================================================================
+
+      - name: 💾 Update Kustomize Manifests with new image tag
+        run: |
+          NEW_TAG=${{ steps.image_tag.outputs.TAG }}
+          FULL_IMAGE_PATH=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          
+          echo "Bắt đầu cập nhật tag $NEW_TAG trong k8s-manifests/kustomization.yaml"
+
+          # 1. Cài đặt Kustomize
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          
+          # 2. Thay thế image tag trong kustomization.yaml
+          ./kustomize edit set image $FULL_IMAGE_PATH:$NEW_TAG -d k8s-manifests
+          
+          # 3. Cấu hình Git user (bắt buộc cho commit)
+          git config user.name github-actions[bot]
+          git config user.email github-actions[bot]@users.noreply.github.com
+          
+          # 4. Commit và Push thay đổi manifest
+          git add k8s-manifests/kustomization.yaml
+          git commit -m "chore(ci): Update image tag to $NEW_TAG for GitOps [skip ci]"
+          # [skip ci] rất quan trọng để ngăn GitHub Actions tự kích hoạt lại pipeline này
+          
+          # Sử dụng GITHUB_TOKEN mặc định để push
+          git push
